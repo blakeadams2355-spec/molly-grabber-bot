@@ -14,8 +14,15 @@ import database
 
 database.init_db()
 
-userbot = Client("my_userbot", api_id=config.API_ID, api_hash=config.API_HASH)
-bot = Client("my_admin_bot", api_id=config.API_ID, api_hash=config.API_HASH, bot_token=config.BOT_TOKEN)
+# Проверка наличия STRING_SESSION в конфиге
+if hasattr(config, "STRING_SESSION") and config.STRING_SESSION:
+    print("✅ Использую STRING_SESSION для входа!")
+    userbot = Client("my_userbot", api_id=config.API_ID, api_hash=config.API_HASH, session_string=config.STRING_SESSION, in_memory=True)
+else:
+    print("⚠️ STRING_SESSION не найден, пытаюсь войти обычно...")
+    userbot = Client("my_userbot", api_id=config.API_ID, api_hash=config.API_HASH)
+
+bot = Client("my_admin_bot", api_id=config.API_ID, api_hash=config.API_HASH, bot_token=config.BOT_TOKEN)git add main.py
 
 PHOTOS = {
     "welcome": "AgACAgIAAxkBAANQaVe-3Zy52Y1ZTdcyMqI3-P4K3bsAAhIPaxv0ZrhKL5SyfYdHoaEACAEAAwIAA3kABx4E",
