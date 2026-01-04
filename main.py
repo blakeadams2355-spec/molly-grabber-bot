@@ -14,10 +14,10 @@ import database
 
 database.init_db()
 
-# Проверка наличия STRING_SESSION в конфиге
+# ✅ ИСПРАВЛЕНИЕ: Убираем in_memory=True, чтобы сессия сохранялась
 if hasattr(config, "STRING_SESSION") and config.STRING_SESSION:
     print("✅ Использую STRING_SESSION для входа!")
-    userbot = Client("my_userbot", api_id=config.API_ID, api_hash=config.API_HASH, session_string=config.STRING_SESSION, in_memory=True)
+    userbot = Client("my_userbot", api_id=config.API_ID, api_hash=config.API_HASH, session_string=config.STRING_SESSION)
 else:
     print("⚠️ STRING_SESSION не найден, пытаюсь войти обычно...")
     userbot = Client("my_userbot", api_id=config.API_ID, api_hash=config.API_HASH)
@@ -158,7 +158,6 @@ def bind_detail_kb(bind_id, is_active):
     ])
 
 
-# --- Функции обработки текста ---
 def check_blacklist(text):
     if not text:
         return False
@@ -188,9 +187,7 @@ def process_text_replacements(text):
     return new_text, True
 
 
-# --- Функция копирования одного поста ---
 async def copy_single_post(message: Message, dest_id: int, copy_all: bool = False):
-    """Копирует один пост в канал назначения с заменами"""
     text = message.text or message.caption or ""
 
     if check_blacklist(text):
@@ -198,7 +195,6 @@ async def copy_single_post(message: Message, dest_id: int, copy_all: bool = Fals
 
     final_text, found = process_text_replacements(text)
 
-    # Если copy_all=True, копируем даже без ключевых слов
     if not found and not copy_all:
         return False, "no_keywords"
 
@@ -213,12 +209,11 @@ async def copy_single_post(message: Message, dest_id: int, copy_all: bool = Fals
         await asyncio.sleep(e.value)
         return await copy_single_post(message, dest_id, copy_all)
     except Exception as e:
+        print(f"❌ Ошибка копирования поста: {e}")
         return False, str(e)
 
 
-# --- Функция копирования альбома ---
 async def copy_album(messages: list, dest_id: int, copy_all: bool = False):
-    """Копирует альбом в канал назначения с заменами"""
     final_media = []
     has_keywords = False
 
@@ -234,7 +229,6 @@ async def copy_album(messages: list, dest_id: int, copy_all: bool = False):
         elif msg.video:
             final_media.append(InputMediaVideo(msg.video.file_id, caption=new_cap, parse_mode=ParseMode.MARKDOWN))
 
-    # Если copy_all=True, копируем даже без ключевых слов
     if not has_keywords and not copy_all:
         return False, "no_keywords"
 
@@ -245,12 +239,11 @@ async def copy_album(messages: list, dest_id: int, copy_all: bool = False):
         await asyncio.sleep(e.value)
         return await copy_album(messages, dest_id, copy_all)
     except Exception as e:
+        print(f"❌ Ошибка копирования альбома: {e}")
         return False, str(e)
 
 
-# --- Функция массового копирования постов ---
 async def bulk_copy_posts(bind_id: int, count: int, status_message, copy_all: bool = False):
-    """Копирует последние N постов из источника в назначение"""
     binds = database.get_binds()
     bind = None
     for b in binds:
@@ -269,13 +262,11 @@ async def bulk_copy_posts(bind_id: int, count: int, status_message, copy_all: bo
     skipped_kw = 0
 
     try:
-        # Шаг 1: Собираем сообщения (от новых к старым)
         messages = []
         fetch_limit = count * 10
         async for msg in userbot.get_chat_history(source_id, limit=fetch_limit):
             messages.append(msg)
 
-        # Шаг 2: Группируем в посты (альбомы = 1 пост)
         posts = []
         processed_groups = set()
 
@@ -284,20 +275,16 @@ async def bulk_copy_posts(bind_id: int, count: int, status_message, copy_all: bo
                 if msg.media_group_id in processed_groups:
                     continue
                 processed_groups.add(msg.media_group_id)
-                # Собираем весь альбом
                 album = [m for m in messages if m.media_group_id == msg.media_group_id]
-                # Сортируем по id чтобы порядок фото был правильный
                 album.sort(key=lambda x: x.id)
                 posts.append({"type": "album", "messages": album, "id": min(m.id for m in album)})
             else:
                 posts.append({"type": "single", "message": msg, "id": msg.id})
 
-        # Шаг 3: Берём последние N постов и сортируем от старых к новым
-        posts.sort(key=lambda x: x["id"], reverse=True)  # от новых к старым
-        posts = posts[:count]  # берём последние N
-        posts.reverse()  # теперь от старых к новым
+        posts.sort(key=lambda x: x["id"], reverse=True)
+        posts = posts[:count]
+        posts.reverse()
 
-        # Шаг 4: Копируем по порядку
         for i, post in enumerate(posts):
             if post["type"] == "album":
                 success, reason = await copy_album(post["messages"], dest_id, copy_all)
@@ -329,7 +316,7 @@ async def bulk_copy_posts(bind_id: int, count: int, status_message, copy_all: bo
 
 @bot.on_message(filters.command("start"))
 async def start_cmd(client, message):
-    text = "👋 **Добро пожаловать в MOLLY GRABBER**\n\nОзнакомиться с функионалом бота можно в FAQ / Помощь."
+    text = "👋 **Добро пожаловать в MOLLY GRABBER**\n\nОзнакомиться с функционалом бота можно в FAQ / Помощь."
     if PHOTOS.get("welcome") and PHOTOS["welcome"].startswith("AgAC"):
         try:
             await message.reply_photo(photo=PHOTOS["welcome"], caption=text, reply_markup=main_menu())
@@ -395,7 +382,6 @@ async def callbacks(client, callback: CallbackQuery):
         await edit_menu(callback.message, "⚙️ **Управление связками**\n\nНажмите на связку для управления:",
                         InlineKeyboardMarkup(kb), "manage_binds")
 
-    # --- Детали связки ---
     elif data.startswith("bind_detail_"):
         bind_id = int(data.split("_")[2])
         binds = database.get_binds()
@@ -414,7 +400,6 @@ async def callbacks(client, callback: CallbackQuery):
         text = f"📌 **Связка #{b_id}**\n\n**Источник:** `{src}`\n**Назначение:** `{dst}`\n**Статус:** {status}"
         await edit_menu(callback.message, text, bind_detail_kb(bind_id, active), "manage_binds")
 
-    # --- Копирование постов ---
     elif data.startswith("copy_posts_"):
         bind_id = int(data.split("_")[2])
         temp_data[user_id] = {"copy_bind_id": bind_id}
@@ -470,13 +455,12 @@ async def callbacks(client, callback: CallbackQuery):
         callback.data = "manage_binds"
         await callbacks(client, callback)
 
-    # --- FAQ ---
     elif data == "faq_menu":
         await edit_menu(callback.message, "❓ **Часто задаваемые вопросы**\nВыберите тему:", faq_menu_kb(), "faq")
 
     elif data == "help_about":
         text = ("🤖 **О боте**\n\n"
-                "Этот бот – граббер контента. Он автоматически копирует посты из одних каналов в другие.\n\n"
+                "Этот бот — граббер контента. Он автоматически копирует посты из одних каналов в другие.\n\n"
                 "**Основные функции:**\n"
                 "• Мгновенное копирование постов.\n"
                 "• Поддержка альбомов (фото/видео).\n"
@@ -549,7 +533,6 @@ async def callbacks(client, callback: CallbackQuery):
         await edit_menu(callback.message, text, blacklist_menu_kb(), "words")
 
 
-# --- УДАЛЕНИЕ ---
 @bot.on_message(filters.regex(r"^/delrep_(\d+)$"))
 async def del_rep_item(client, message):
     try:
@@ -572,7 +555,6 @@ async def del_bl_item(client, message):
         pass
 
 
-# --- ВВОД ДАННЫХ ---
 @bot.on_message(filters.document & filters.private)
 async def handle_document(client, message):
     user_id = message.from_user.id
@@ -678,75 +660,101 @@ async def handle_text(client, message):
         input_wait[user_id] = None
 
 
-# --- ЮЗЕРБОТ (ЛОГИКА) ---
+# ✅ ИСПРАВЛЕНО: Обработчик слушает все каналы
 @userbot.on_message(filters.channel)
 async def source_listener(client, message: Message):
-    mapping = database.get_active_sources()
-    if message.chat.id not in mapping:
-        return
-    destinations = mapping[message.chat.id]
-
-    if message.media_group_id:
-        if message.media_group_id in processed_groups:
-            return
-        processed_groups.append(message.media_group_id)
-        if len(processed_groups) > 50:
-            processed_groups.pop(0)
-
-    delay = random.randint(9, 20)
-    await send_log(f"⏳ Обнаружен пост в `{message.chat.title}`\nОжидаю {delay} сек...")
-    await asyncio.sleep(delay)
-
-    if message.media_group_id:
-        try:
-            media_group = await client.get_media_group(message.chat.id, message.id)
-        except:
-            return
-        for dest in destinations:
-            # ✅ ДОБАВЛЕНО copy_all=True
-            success, reason = await copy_album(media_group, dest, copy_all=True)
-            if success:
-                await send_log("✅ Альбом скопирован!")
-            elif reason == "blacklist":
-                await send_log("⛔ Пост пропущен: найдено стоп-слово.")
-            else:
-                await send_log("⚠️ Пост пропущен: нет ключевых слов.")
-    else:
-        for dest in destinations:
-            # ✅ ДОБАВЛЕНО copy_all=True
-            success, reason = await copy_single_post(message, dest, copy_all=True)
-            if success:
-                await send_log("✅ Пост скопирован!")
-            elif reason == "blacklist":
-                await send_log("⛔ Пост пропущен: найдено стоп-слово.")
-            else:
-                await send_log("⚠️ Пост пропущен: нет ключевых слов.")
-
-
-# --- ЗАПУСК ---
-async def main():
-    print("Запускаем...")
-    await userbot.start()
-
-    # 👇 ДОБАВЛЕННЫЙ БЛОК: ВОССТАНОВЛЕНИЕ ДОСТУПА К КАНАЛАМ 👇
-    print("♻️ Восстанавливаем доступ к каналам из базы...")
     try:
+        mapping = database.get_active_sources()
+        if message.chat.id not in mapping:
+            return
+
+        destinations = mapping[message.chat.id]
+
+        print(f"📨 Получен пост из {message.chat.title} (ID: {message.chat.id})")
+
+        if message.media_group_id:
+            if message.media_group_id in processed_groups:
+                return
+            processed_groups.append(message.media_group_id)
+            if len(processed_groups) > 50:
+                processed_groups.pop(0)
+
+        delay = random.randint(9, 20)
+        await send_log(f"⏳ Обнаружен пост в `{message.chat.title}`\nОжидаю {delay} сек...")
+        await asyncio.sleep(delay)
+
+        if message.media_group_id:
+            try:
+                media_group = await client.get_media_group(message.chat.id, message.id)
+            except Exception as e:
+                print(f"❌ Ошибка получения альбома: {e}")
+                return
+            for dest in destinations:
+                success, reason = await copy_album(media_group, dest, copy_all=True)
+                if success:
+                    await send_log("✅ Альбом скопирован!")
+                elif reason == "blacklist":
+                    await send_log("⛔ Пост пропущен: найдено стоп-слово.")
+                else:
+                    await send_log(f"⚠️ Ошибка: {reason}")
+        else:
+            for dest in destinations:
+                success, reason = await copy_single_post(message, dest, copy_all=True)
+                if success:
+                    await send_log("✅ Пост скопирован!")
+                elif reason == "blacklist":
+                    await send_log("⛔ Пост пропущен: найдено стоп-слово.")
+                else:
+                    await send_log(f"⚠️ Ошибка: {reason}")
+    except Exception as e:
+        print(f"❌ КРИТИЧЕСКАЯ ОШИБКА в source_listener: {e}")
+        await send_log(f"❌ ОШИБКА: {e}")
+
+
+# ✅ ИСПРАВЛЕНО: Восстановление доступа при старте
+async def restore_channel_access():
+    """Восстанавливает доступ к каналам из базы данных"""
+    print("♻️ Восстанавливаю доступ к каналам...")
+    try:
+        # Получаем диалоги для обновления кэша
+        dialogs_count = 0
+        async for dialog in userbot.get_dialogs():
+            dialogs_count += 1
+            if dialogs_count >= 50:  # Первые 50 диалогов достаточно
+                break
+
+        print(f"✅ Загружено {dialogs_count} диалогов")
+
+        # Дополнительно проверяем каналы из связок
         binds = database.get_binds()
         for row in binds:
-            # row[1] - ID источника, row[2] - ID назначения
             try:
-                # Просто запрашиваем чат, чтобы Pyrogram запомнил его Access Hash
-                await userbot.get_chat(row[1])
-                await userbot.get_chat(row[2])
+                # Получаем информацию о каналах
+                src_chat = await userbot.get_chat(row[1])
+                dest_chat = await userbot.get_chat(row[2])
+                print(f"✅ Доступ к {src_chat.title} -> {dest_chat.title}")
             except Exception as e:
-                print(f"⚠️ Не удалось обновить доступ к {row[1]} или {row[2]}: {e}")
-        print("✅ Доступ восстановлен!")
+                print(f"⚠️ Не удалось получить доступ к связке {row[1]} -> {row[2]}: {e}")
+                await send_log(f"⚠️ Проблема с доступом к каналам:\n{row[1]} -> {row[2]}\n\nОшибка: {e}")
+
+        print("✅ Доступ к каналам восстановлен!")
     except Exception as e:
-        print(f"Ошибка при восстановлении доступов: {e}")
-    # 👆 КОНЕЦ ДОБАВЛЕННОГО БЛОКА 👆
+        print(f"❌ Ошибка при восстановлении доступа: {e}")
+        await send_log(f"❌ КРИТИЧЕСКАЯ ОШИБКА при старте: {e}")
+
+
+async def main():
+    print("🚀 Запускаем бота...")
+    await userbot.start()
+    print("✅ Userbot запущен")
 
     await bot.start()
-    print("Работаем!")
+    print("✅ Bot запущен")
+
+    # Восстанавливаем доступ к каналам
+    await restore_channel_access()
+
+    print("🎉 Бот работает!")
     await idle()
     await userbot.stop()
     await bot.stop()
