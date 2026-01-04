@@ -358,6 +358,13 @@ async def callbacks(client, callback: CallbackQuery):
         input_wait[user_id] = None
         await edit_menu(callback.message, "🏠 **Главное меню**", main_menu(), "main_menu")
 
+    elif data == "toggle_logs":
+        current = CACHE_SETTINGS.get("logs_enabled")
+        database.set_setting("logs_enabled", "0" if current else "1")
+        reload_cache()
+        await callback.message.edit_reply_markup(reply_markup=settings_menu_kb())
+        await callback.answer(f"Логи {'ВКЛ' if not current else 'ВЫКЛ'}")
+
     elif data == "settings_menu":
         await edit_menu(callback.message, "🛠 **Настройки**", settings_menu_kb(), "settings")
 
@@ -504,13 +511,6 @@ async def callbacks(client, callback: CallbackQuery):
                 "🔹 **Логирование**: Если включено, бот присылает отчеты о каждом посте (скопирован/пропущен) в личку админу.\n"
                 "🔹 **Загрузить базу**: Позволяет восстановить настройки из файла `bot_data.db`.")
         await edit_menu(callback.message, text, back_to_faq_kb())
-
-    elif data == "toggle_logs":
-        current = CACHE_SETTINGS.get("logs_enabled")
-        database.set_setting("logs_enabled", "0" if current else "1")
-        reload_cache()
-        await callback.message.edit_reply_markup(reply_markup=settings_menu_kb())
-        await callback.answer(f"Логи {'ВКЛ' if not current else 'ВЫКЛ'}")
 
     elif data == "upload_db":
         input_wait[user_id] = "waiting_db_upload"
