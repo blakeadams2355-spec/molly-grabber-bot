@@ -22,7 +22,7 @@ else:
     print("⚠️ STRING_SESSION не найден, пытаюсь войти обычно...")
     userbot = Client("my_userbot", api_id=config.API_ID, api_hash=config.API_HASH)
 
-bot = Client("my_admin_bot", api_id=config.API_ID, api_hash=config.API_HASH, bot_token=config.BOT_TOKEN)git add main.py
+bbot = Client("my_admin_bot", api_id=config.API_ID, api_hash=config.API_HASH, bot_token=config.BOT_TOKEN)
 
 PHOTOS = {
     "welcome": "AgACAgIAAxkBAANQaVe-3Zy52Y1ZTdcyMqI3-P4K3bsAAhIPaxv0ZrhKL5SyfYdHoaEACAEAAwIAA3kABx4E",
