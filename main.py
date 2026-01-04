@@ -703,7 +703,8 @@ async def source_listener(client, message: Message):
         except:
             return
         for dest in destinations:
-            success, reason = await copy_album(media_group, dest)
+            # ✅ ДОБАВЛЕНО copy_all=True
+            success, reason = await copy_album(media_group, dest, copy_all=True)
             if success:
                 await send_log("✅ Альбом скопирован!")
             elif reason == "blacklist":
@@ -712,7 +713,8 @@ async def source_listener(client, message: Message):
                 await send_log("⚠️ Пост пропущен: нет ключевых слов.")
     else:
         for dest in destinations:
-            success, reason = await copy_single_post(message, dest)
+            # ✅ ДОБАВЛЕНО copy_all=True
+            success, reason = await copy_single_post(message, dest, copy_all=True)
             if success:
                 await send_log("✅ Пост скопирован!")
             elif reason == "blacklist":
